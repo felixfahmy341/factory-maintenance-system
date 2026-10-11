@@ -963,6 +963,9 @@
         const reporter = profiles.find(x => x.id === o.reported_by);
         const technician = profiles.find(x => x.id === o.assigned_technician);
         const canManage = hasFullAccess();
+        const isTechnician = currentProfile?.role === "technician";
+        const canEditAssignedOrder = isTechnician && String(o.assigned_technician || "") === String(currentUser?.id || "");
+        const canEditOrder = canManage || canEditAssignedOrder;
         panel.innerHTML = `
           <h2>تفاصيل أمر الصيانة ${escapeHtml(o.order_number || "#" + o.id)}</h2>
           <p><strong>وصف العطل:</strong> ${escapeHtml(o.fault_description || "—")}</p>
@@ -971,8 +974,9 @@
           <p><strong>الحالة:</strong> <span id="detailStatus"></span></p>
           <p><strong>إجراء الإصلاح:</strong> ${escapeHtml(o.action_taken || "لم يسجل بعد")}</p>
           <div class="photo-grid" id="orderPhotoGrid"><span class="muted">جاري تحميل الصور...</span></div>
-          <div id="manageOrderForm" class="${canManage || currentProfile?.role === "technician" ? "" : "hidden"}">
+          <div id="manageOrderForm" class="${canEditOrder ? "" : "hidden"}">
             <h3>تحديث أمر الصيانة</h3>
+            ${isTechnician && !canEditAssignedOrder ? '<p class="muted">يمكن لفني الإطفاء تحديث الأوامر المسندة إليه فقط.</p>' : ''}
             <div class="grid">
               <label>الحالة
                 <select id="detailStatusSelect">
@@ -980,9 +984,9 @@
                   <option value="pending_approval">بانتظار الاعتماد</option><option value="closed">مغلق</option><option value="rejected">مرفوض</option>
                 </select>
               </label>
-              <label>الفني المكلّف
+              ${canManage ? `<label>الفني المكلّف
                 <select id="detailTechnician"><option value="">بدون تعيين</option>${profiles.filter(p => p.role === "technician").map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.full_name || p.id)}</option>`).join("")}</select>
-              </label>
+              </label>` : ''}
             </div>
             <label style="margin-top:12px">إجراء الإصلاح / ملاحظات العمل
               <textarea id="detailAction" maxlength="5000" placeholder="اكتب ما تم تنفيذه وقطع الغيار والملاحظات..."></textarea>
@@ -993,7 +997,7 @@
             </div>
             <div class="actions"><button id="saveDetailsBtn" type="button">حفظ التحديث</button><button id="closeDetailsBtn" type="button" class="secondary">إغلاق التفاصيل</button></div>
           </div>
-          <button id="closeReadOnlyBtn" type="button" class="secondary ${canManage || currentProfile?.role === "technician" ? "hidden" : ""}">إغلاق التفاصيل</button>`;
+          <button id="closeReadOnlyBtn" type="button" class="secondary ${canEditOrder ? "hidden" : ""}">إغلاق التفاصيل</button>`;
         $("detailStatus").appendChild(statusBadge(o.status));
         if ($("detailStatusSelect")) $("detailStatusSelect").value = o.status || "open";
         if ($("detailTechnician")) $("detailTechnician").value = o.assigned_technician || "";
@@ -1025,7 +1029,13 @@
 
       async function saveOrderDetails() {
         if (!selectedOrderId || !currentProfile) return;
-        const btn = $("saveDetailsBtn"); btn.disabled = true; btn.textContent = "جاري الحفظ...";
+        const selectedOrder = orders.find(x => String(x.id) === String(selectedOrderId));
+        const isTechnician = currentProfile.role === "technician";
+        if (!selectedOrder || (isTechnician && String(selectedOrder.assigned_technician || "") !== String(currentUser?.id || ""))) {
+          message("فني الإطفاء يستطيع تحديث أوامر الصيانة المسندة إليه فقط.", "error");
+          return;
+        }
+        const btn = $("saveDetailsBtn"); if (!btn) return; btn.disabled = true; btn.textContent = "جاري الحفظ...";
         try {
           const updates = {
             status: $("detailStatusSelect").value,
@@ -1033,7 +1043,8 @@
             updated_at: new Date().toISOString()
           };
           if (hasFullAccess()) updates.assigned_technician = $("detailTechnician").value || null;
-          updates.repaired_at = updates.status === "closed" ? new Date().toISOString() : null;
+          if (updates.status === "closed") updates.repaired_at = new Date().toISOString();
+          else if (hasFullAccess()) updates.repaired_at = null;
           const { error } = await client.from("work_orders").update(updates).eq("id", selectedOrderId);
           if (error) throw error;
           try {
