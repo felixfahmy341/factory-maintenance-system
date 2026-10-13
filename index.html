@@ -869,7 +869,7 @@
         </div>
         <button id="refreshUsersBtn" type="button" class="secondary">تحديث الحسابات</button>
       </div>
-      <div class="admin-note">لوحة الإدارة متاحة لحسابات «مسؤول النظام» فقط. يتم إنشاء الحسابات من وظيفة خادمية (Edge Function)، ولا يُستخدم مفتاح service_role داخل المتصفح.</div>
+      <div class="admin-note">لوحة الإدارة متاحة لحسابات «مسؤول النظام» فقط. يتم إنشاء الحسابات وإدارتها من خلال دوال SQL آمنة داخل قاعدة البيانات (SECURITY DEFINER)، ولا يُستخدم مفتاح service_role داخل المتصفح.</div>
       <form id="adminCreateUserForm" style="margin-top:18px">
         <div class="grid">
           <label>الاسم بالكامل
@@ -1078,8 +1078,11 @@
 /* =====================================================================
  * نظام إدارة صيانة السويس للصلب — طبعة محسّنة
  * ---------------------------------------------------------------------
- * - Supabase (Auth + Postgres + Storage + Edge Function).
- * - Edge Function: "admin-users".
+ * - Supabase (Auth + Postgres + Storage + RPC Functions).
+ * - SQL Functions: admin_create_user, admin_update_user, admin_set_active,
+ *                  admin_reset_password, admin_set_avatar, admin_delete_user,
+ *                  admin_list_audit.
+ * - Edge Function: "send-push" (للإشعارات فقط).
  * - الجداول: factories, locations, equipment, work_orders, profiles.
  * - Buckets: "work-order-photos" (خاص)، "profile-photos" (عام).
  * - الحماية الفعلية تعتمد على RLS؛ الواجهة تخفي فقط.
@@ -1089,6 +1092,7 @@
  *  2) loadStats تستخدم RPC "get_work_order_stats" إن وُجدت، وإلا fallback.
  *  3) Realtime يحدّث الصف المتأثر فقط + يعدّل الإحصائيات محليًا، مع debounce للحالات غير المؤكدة.
  *  4) تصفير authListenerClient في teardown.
+ *  5) إدارة الحسابات عبر SQL RPC Functions بدلًا من Edge Function.
  * ===================================================================== */
 (() => {
   "use strict";
@@ -1499,7 +1503,6 @@
     if (state.client) {
       try { await state.client.auth.stopAutoRefresh?.(); } catch (_) {}
     }
-    // تحسين #4: تصفير مرجع المستمع القديم حتى لا يبقى معلّقًا على عميل سابق
     authListenerClient = null;
 
     state.currentUser = null;
@@ -1628,7 +1631,6 @@
     }
   }
 
-  /* ---- الإحصائيات: تحسين #2 (RPC + Fallback) ---- */
   function updateStatsDisplay() {
     $("totalCount").textContent = state.stats.total;
     $("openCount").textContent = state.stats.open;
@@ -1636,7 +1638,6 @@
   }
 
   async function loadStats() {
-    // المسار الأسرع: RPC يجمع كل شيء في طلب واحد (إن وُجدت الدالة)
     try {
       const { data, error } = await state.client.rpc("get_work_order_stats");
       if (!error && data && typeof data === "object") {
@@ -1650,7 +1651,6 @@
       }
     } catch (_) { /* الدالة غير موجودة — نتابع للخطة البديلة */ }
 
-    // خطة بديلة: 3 استعلامات head فقط (خفيفة، بلا بيانات)
     const [totalRes, openRes, closedRes] = await Promise.all([
       state.client.from("work_orders").select("*", { count: "exact", head: true }),
       state.client.from("work_orders").select("*", { count: "exact", head: true })
@@ -1710,7 +1710,6 @@
     renderOrders();
   }
 
-  /* ================= Realtime — تحسين #3 ================= */
   function matchesCurrentFilters(row) {
     const status = $("statusFilter")?.value || "";
     if (status && row.status !== status) return false;
@@ -1774,11 +1773,9 @@
         state.ordersTotal = Math.max(0, state.ordersTotal - 1);
         renderOrders();
       }
-      // لسنا متأكدين من الحالة القديمة → تحديث مُخفَّف
       state.realtimeStatsRefresh();
     }
 
-    // تحديث لوحة التفاصيل إن كانت مفتوحة على نفس الأمر
     const affectedId = newRow?.id || oldRow?.id;
     if (state.selectedOrderId && String(state.selectedOrderId) === String(affectedId)) {
       if (eventType === "DELETE") {
@@ -1826,7 +1823,6 @@
       .subscribe();
   }
 
-  /* ================= عرض الأوامر ================= */
   function renderOrders() {
     const body = $("ordersBody");
     body.replaceChildren();
@@ -1884,22 +1880,79 @@
     );
   }
 
-  /* ================= Admin: users ================= */
+  /* ================= Admin: users (SQL RPC) ================= */
   async function invokeAdminFunction(payload) {
-    const { data, error } = await state.client.functions.invoke("admin-users", { body: payload });
-    if (error) {
-      let detail = error.message || "تعذر تنفيذ الطلب.";
-      try {
-        const ctx = error.context;
-        if (ctx && typeof ctx.json === "function") {
-          const body = await ctx.json();
-          if (body?.error) detail = body.error;
-        }
-      } catch (e) {
-        console.warn("admin fn error parse failed", e);
-      }
-      throw new Error(detail);
+    const action = payload?.action;
+    let rpcName, params;
+
+    switch (action) {
+      case "create_user":
+        rpcName = "admin_create_user";
+        params = {
+          p_full_name:       payload.full_name,
+          p_email:           payload.email,
+          p_password:        payload.password,
+          p_role:            payload.role,
+          p_employee_number: payload.employee_number || null,
+          p_phone:           payload.phone || null
+        };
+        break;
+
+      case "update_user":
+        rpcName = "admin_update_user";
+        params = {
+          p_user_id:         payload.user_id,
+          p_full_name:       payload.full_name,
+          p_email:           payload.email,
+          p_role:            payload.role,
+          p_employee_number: payload.employee_number || null,
+          p_phone:           payload.phone || null
+        };
+        break;
+
+      case "set_active":
+        rpcName = "admin_set_active";
+        params = {
+          p_user_id:   payload.user_id,
+          p_is_active: payload.is_active
+        };
+        break;
+
+      case "reset_password":
+        rpcName = "admin_reset_password";
+        params = {
+          p_user_id:  payload.user_id,
+          p_password: payload.password
+        };
+        break;
+
+      case "set_avatar":
+        rpcName = "admin_set_avatar";
+        params = {
+          p_user_id:    payload.user_id,
+          p_avatar_url: payload.avatar_url
+        };
+        break;
+
+      case "delete_user":
+        rpcName = "admin_delete_user";
+        params = {
+          p_user_id:       payload.user_id,
+          p_confirm_email: payload.confirm_email
+        };
+        break;
+
+      case "list_audit":
+        rpcName = "admin_list_audit";
+        params = {};
+        break;
+
+      default:
+        throw new Error("إجراء غير معروف: " + action);
     }
+
+    const { data, error } = await state.client.rpc(rpcName, params);
+    if (error) throw new Error(error.message || "تعذر تنفيذ الطلب");
     if (data?.error) throw new Error(data.error);
     return data;
   }
@@ -2317,7 +2370,6 @@
     await renderOrderPhotos(o.id);
   }
 
-  /* ---- تحسين #1: كشف موثوق للمجلدات ---- */
   async function renderOrderPhotos(orderId) {
     const grid = $("orderPhotoGrid");
     if (!grid) return;
@@ -2328,9 +2380,6 @@
 
       const files = [];
       for (const entry of (data || [])) {
-        // في Supabase Storage:
-        //   - الملف: id و metadata موجودان
-        //   - المجلد: id == null و metadata == null
         const isFolder = !entry.id && !entry.metadata;
         if (isFolder) {
           const { data: nested, error: nestedError } = await state.client.storage
@@ -2342,7 +2391,6 @@
             }
           }
         } else if (entry.id) {
-          // ملف في الجذر (نادرًا) — نعرضه تحت "صور"
           files.push({ path: `${orderId}/${entry.name}`, phase: "other" });
         }
       }
