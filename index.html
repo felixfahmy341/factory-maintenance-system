@@ -778,6 +778,91 @@
       transition-duration: .01ms !important;
     }
   }
+
+  /* ===== زر واتساب عائم (في صفحة الدخول فقط) ===== */
+  .whatsapp-float {
+    position: fixed;
+    bottom: 22px;
+    left: 22px;
+    z-index: 1500;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px 12px 16px;
+    background: linear-gradient(135deg, #25D366, #1ebe5b);
+    color: #fff !important;
+    border-radius: 50px;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13.5px;
+    box-shadow: 0 8px 22px rgba(37, 211, 102, .42);
+    transition: transform .18s, box-shadow .18s, filter .2s;
+    max-width: calc(100vw - 44px);
+    animation: waFloatIn .35s ease;
+  }
+  .whatsapp-float:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 14px 30px rgba(37, 211, 102, .55);
+    filter: brightness(1.05);
+  }
+  .whatsapp-float:active { transform: translateY(-1px); }
+  .whatsapp-float svg {
+    width: 24px;
+    height: 24px;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.2));
+  }
+  .whatsapp-float .wa-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+    text-align: right;
+  }
+  .whatsapp-float .wa-title {
+    font-size: 13.5px;
+    font-weight: 800;
+  }
+  .whatsapp-float .wa-sub {
+    font-size: 11px;
+    font-weight: 500;
+    opacity: .92;
+  }
+  @keyframes waFloatIn {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (max-width: 480px) {
+    .whatsapp-float { bottom: 14px; left: 14px; padding: 10px 14px 10px 12px; }
+    .whatsapp-float .wa-sub { display: none; }
+    .whatsapp-float .wa-title { font-size: 12.5px; }
+  }
+
+  /* ===== زر واتساب في الفوتر ===== */
+  .footer-whatsapp {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 20px;
+    background: linear-gradient(135deg, #25D366, #1ebe5b);
+    color: #fff !important;
+    text-decoration: none;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 13px;
+    margin-top: 6px;
+    box-shadow: 0 6px 16px rgba(37, 211, 102, .32);
+    transition: transform .18s, box-shadow .18s, filter .2s;
+  }
+  .footer-whatsapp:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(37, 211, 102, .48);
+    filter: brightness(1.05);
+  }
+  .footer-whatsapp svg {
+    width: 18px;
+    height: 18px;
+    flex: 0 0 auto;
+  }
 </style>
 
 </head>
@@ -1069,10 +1154,33 @@
     <img src="https://al-safer.com/wp-content/uploads/2026/10/اللجو.png" alt="شعار شركة السويس للصلب" class="footer-logo">
     <div>نظام إدارة صيانة السويس للصلب</div>
     <span class="dev-credit">Developed &amp; Programmed by Abdall Fahmy Abukab</span>
+    <a class="footer-whatsapp"
+       href="https://wa.me/201110566362?text=%D9%85%D8%B1%D8%AD%D8%A8%D9%8B%D8%A7%D8%8C%20%D8%A3%D8%AD%D8%AA%D8%A7%D8%AC%20%D9%85%D8%B3%D8%A7%D8%B9%D8%AF%D8%A9%20%D9%81%D9%8A%20%D9%86%D8%B8%D8%A7%D9%85%20%D8%B5%D9%8A%D8%A7%D9%86%D8%A9%20%D8%A7%D9%84%D8%B3%D9%88%D9%8A%D8%B3%20%D9%84%D9%84%D8%B5%D9%84%D8%A8"
+       target="_blank" rel="noopener"
+       aria-label="تواصل مع المبرمج على واتساب">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+      </svg>
+      <span>تواصل مع المبرمج — 01110566362</span>
+    </a>
   </div>
 </footer>
 
 <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- زر واتساب عائم - يظهر فقط في صفحة تسجيل الدخول -->
+<a id="whatsappFloatBtn" class="whatsapp-float hidden"
+   href="https://wa.me/201110566362?text=%D9%85%D8%B1%D8%AD%D8%A8%D9%8B%D8%A7%D8%8C%20%D8%A3%D8%AD%D8%AA%D8%A7%D8%AC%20%D9%85%D8%B3%D8%A7%D8%B9%D8%AF%D8%A9%20%D9%81%D9%8A%20%D9%86%D8%B8%D8%A7%D9%85%20%D8%B5%D9%8A%D8%A7%D9%86%D8%A9%20%D8%A7%D9%84%D8%B3%D9%88%D9%8A%D8%B3%20%D9%84%D9%84%D8%B5%D9%84%D8%A8"
+   target="_blank" rel="noopener"
+   aria-label="تواصل مع المبرمج على واتساب">
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+  </svg>
+  <span class="wa-text">
+    <span class="wa-title">تواصل مع المبرمج</span>
+    <span class="wa-sub">للاستفسار والدعم الفني</span>
+  </span>
+</a>
 
 <script>
 /* =====================================================================
@@ -1090,9 +1198,11 @@
  * تحسينات هذه النسخة:
  *  1) كشف موثوق للمجلدات في Storage عبر (id + metadata).
  *  2) loadStats تستخدم RPC "get_work_order_stats" إن وُجدت، وإلا fallback.
- *  3) Realtime يحدّث الصف المتأثر فقط + يعدّل الإحصائيات محليًا، مع debounce للحالات غير المؤكدة.
+ *  3) Realtime يحدّث الصف المتأثر فقط + يعدّل الإحصائيات محليًا، مع debounce.
  *  4) تصفير authListenerClient في teardown.
  *  5) إدارة الحسابات عبر SQL RPC Functions بدلًا من Edge Function.
+ *  6) جلسة مستمرة: لا تسجيل خروج تلقائي إلا عند SIGNED_OUT.
+ *  7) زر واتساب عائم في صفحة الدخول + زر في الفوتر.
  * ===================================================================== */
 (() => {
   "use strict";
@@ -1428,6 +1538,8 @@
     $("setup").classList.toggle("hidden", s !== "setup");
     $("login").classList.toggle("hidden", s !== "login");
     $("dashboard").classList.toggle("hidden", s !== "dashboard");
+    // زر واتساب العائم يظهر فقط في صفحة تسجيل الدخول
+    $("whatsappFloatBtn")?.classList.toggle("hidden", s !== "login");
   }
 
   /* ================= Credentials ================= */
@@ -1468,7 +1580,8 @@
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
-          storageKey: "sws-maint-auth"
+          storageKey: "sws-maint-auth-v2",
+          flowType: "pkce"
         }
       });
 
@@ -1526,12 +1639,44 @@
     if (!client || authListenerClient === client) return;
     authListenerClient = client;
 
-    client.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT" || (event === "TOKEN_REFRESHED" && !session)) {
+    client.auth.onAuthStateChange(async (event, session) => {
+      console.log("[Auth]", event, session?.user?.email || "(no session)");
+
+      // 1) تسجيل الخروج الحقيقي فقط عند SIGNED_OUT
+      if (event === "SIGNED_OUT") {
         void teardown();
         showState("login");
-        message("انتهت الجلسة، الرجاء تسجيل الدخول مرة أخرى.", "error");
+        return;
       }
+
+      // 2) استعادة الجلسة تلقائيًا عند فتح التطبيق أو تبديل التبويبات
+      if (session?.user && !state.currentUser) {
+        if (event === "INITIAL_SESSION") return;
+        try {
+          await enterDashboard(session.user);
+        } catch (err) {
+          console.warn("enterDashboard from listener failed", err);
+        }
+        return;
+      }
+
+      // 3) تحديث البروفايل عند تعديل بيانات المستخدم
+      if (event === "USER_UPDATED" && session?.user && state.currentUser) {
+        try {
+          const { data: profile } = await client
+            .from("profiles")
+            .select("id,full_name,email,role,is_active,employee_number,phone,avatar_url")
+            .eq("id", session.user.id)
+            .maybeSingle();
+          if (profile && profile.is_active) {
+            state.currentProfile = profile;
+            $("userInfo").textContent =
+              `${profile.full_name || session.user.email} — ${ROLE_LABELS[profile.role] || profile.role}`;
+          }
+        } catch (_) {}
+      }
+
+      // ملاحظة: لا نسجل خروج المستخدم عند فشل تجديد التوكن (قد يحدث مؤقتًا عند انقطاع النت)
     });
   }
 
@@ -1559,10 +1704,17 @@
         throw new Error("تغيّر اتصال قاعدة البيانات أثناء تحميل الحساب. أعد الاتصال.");
       }
 
-      if (!profile || !profile.is_active) {
-        await client.auth.signOut();
+      // لو البروفايل مش موجود خالص → نرفض الدخول بدون signOut
+      if (!profile) {
         showState("login");
-        message("الحساب غير موجود في profiles أو غير مفعّل. راجع بيانات الحساب.", "error");
+        message("لا يوجد ملف شخصي مرتبط بحسابك. تواصل مع الأدمن.", "error");
+        return;
+      }
+
+      // لو الحساب معطّل → نرفض الدخول بدون signOut (يمكن للأدمن تفعيله لاحقًا)
+      if (!profile.is_active) {
+        showState("login");
+        message("حسابك معطّل حاليًا. تواصل مع الأدمن لتفعيله.", "error");
         return;
       }
 
