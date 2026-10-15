@@ -954,7 +954,7 @@
         </div>
         <button id="refreshUsersBtn" type="button" class="secondary">تحديث الحسابات</button>
       </div>
-      <div class="admin-note">لوحة الإدارة متاحة لحسابات «مسؤول النظام» فقط. يتم إنشاء الحسابات وإدارتها من خلال دوال SQL آمنة داخل قاعدة البيانات (SECURITY DEFINER)، ولا يُستخدم مفتاح service_role داخل المتصفح.</div>
+      <div class="admin-note">لوحة الإدارة متاحة لحسابات «مسؤول النظام» فقط. يتم إنشاء الحسابات وإدارتها من خلال دوال SQL آمنة داخل قاعدة البيانات (SECURITY DEFINER)، ولا يُستخدم مفتاح service_role داخل المتصفح. عمليات الحذف تتطلب كلمة مرور الأدمن.</div>
       <form id="adminCreateUserForm" style="margin-top:18px">
         <div class="grid">
           <label>الاسم بالكامل
@@ -1189,7 +1189,7 @@
  * - Supabase (Auth + Postgres + Storage + RPC Functions).
  * - SQL Functions: admin_create_user, admin_update_user, admin_set_active,
  *                  admin_reset_password, admin_set_avatar, admin_delete_user,
- *                  admin_list_audit.
+ *                  admin_delete_work_order, admin_list_audit.
  * - Edge Function: "send-push" (للإشعارات فقط).
  * - الجداول: factories, locations, equipment, work_orders, profiles.
  * - Buckets: "work-order-photos" (خاص)، "profile-photos" (عام).
@@ -1203,6 +1203,8 @@
  *  5) إدارة الحسابات عبر SQL RPC Functions بدلًا من Edge Function.
  *  6) جلسة مستمرة: لا تسجيل خروج تلقائي إلا عند SIGNED_OUT.
  *  7) زر واتساب عائم في صفحة الدخول + زر في الفوتر.
+ *  8) حذف الحسابات وأوامر الصيانة بكلمة مرور الأدمن.
+ *  9) اتصال تلقائي بقاعدة البيانات إن كانت البيانات محفوظة.
  * ===================================================================== */
 (() => {
   "use strict";
@@ -2089,8 +2091,17 @@
       case "delete_user":
         rpcName = "admin_delete_user";
         params = {
-          p_user_id:       payload.user_id,
-          p_confirm_email: payload.confirm_email
+          p_user_id:        payload.user_id,
+          p_confirm_email:  payload.confirm_email,
+          p_admin_password: payload.admin_password
+        };
+        break;
+
+      case "delete_work_order":
+        rpcName = "admin_delete_work_order";
+        params = {
+          p_order_id:       payload.order_id,
+          p_admin_password: payload.admin_password
         };
         break;
 
@@ -2349,16 +2360,28 @@
     const confirmEmail = p.email || "";
     const result = await openDialog({
       title: "تأكيد حذف الحساب",
-      bodyText: `تحذير: سيتم حذف حساب ${p.full_name || p.email}. ` +
-                `قد يمنع النظام الحذف إذا كان مرتبطًا بسجلات صيانة.`,
-      fields: [{
-        name: "confirm",
-        label: "اكتب البريد الإلكتروني للتأكيد",
-        type: "email",
-        required: true,
-        dir: "ltr",
-        placeholder: confirmEmail || "email@example.com"
-      }],
+      bodyText: `⚠️ تحذير: سيتم حذف حساب ${p.full_name || p.email} نهائيًا.\n` +
+                `• أوامر الصيانة المرتبطة ستبقى لكن بدون اسم المبلّغ.\n` +
+                `• العملية لا يمكن التراجع عنها.\n` +
+                `• يجب إدخال كلمة مرور الأدمن للتأكيد.`,
+      fields: [
+        {
+          name: "confirm",
+          label: "اكتب البريد الإلكتروني للتأكيد",
+          type: "email",
+          required: true,
+          dir: "ltr",
+          placeholder: confirmEmail || "email@example.com"
+        },
+        {
+          name: "password",
+          label: "كلمة مرور الأدمن",
+          type: "password",
+          required: true,
+          dir: "ltr",
+          autocomplete: "current-password"
+        }
+      ],
       confirmText: "حذف نهائي",
       danger: true
     });
@@ -2366,17 +2389,81 @@
     if (result.confirm.toLowerCase() !== confirmEmail.toLowerCase()) {
       return toast("البريد غير مطابق، لم يتم الحذف.", "error");
     }
+    if (!result.password || result.password.length < 4) {
+      return toast("كلمة المرور مطلوبة.", "error");
+    }
     try {
       await invokeAdminFunction({
         action: "delete_user",
         user_id: p.id,
-        confirm_email: result.confirm.toLowerCase()
+        confirm_email: result.confirm.toLowerCase(),
+        admin_password: result.password
       });
       await loadAdminUsers();
       await loadAll();
       toast("تم حذف الحساب.", "success");
     } catch (err) {
       toast("تعذر حذف الحساب: " + (err.message || err), "error", 6000);
+    }
+  }
+
+  /* ================= حذف أمر صيانة ================= */
+  async function deleteWorkOrder(orderId) {
+    if (state.currentProfile?.role !== "admin") {
+      return toast("حذف أوامر الصيانة متاح للأدمن فقط.", "error");
+    }
+
+    const o = state.orders.find(x => String(x.id) === String(orderId));
+    if (!o) return;
+
+    const label = o.order_number || ("#" + o.id);
+
+    const result = await openDialog({
+      title: "تأكيد حذف أمر الصيانة",
+      bodyText: `⚠️ تحذير: سيتم حذف أمر الصيانة ${label} نهائيًا.\n` +
+                `• سيتم حذف كل التحديثات والاعتمادات والقطع المرتبطة.\n` +
+                `• العملية لا يمكن التراجع عنها.\n` +
+                `• يجب إدخال كلمة مرور الأدمن للتأكيد.`,
+      fields: [
+        {
+          name: "password",
+          label: "كلمة مرور الأدمن",
+          type: "password",
+          required: true,
+          dir: "ltr",
+          autocomplete: "current-password"
+        }
+      ],
+      confirmText: "حذف نهائي",
+      danger: true
+    });
+
+    if (!result) return;
+    if (!result.password || result.password.length < 4) {
+      return toast("كلمة المرور مطلوبة.", "error");
+    }
+
+    globalLoading(true);
+    try {
+      await invokeAdminFunction({
+        action: "delete_work_order",
+        order_id: orderId,
+        admin_password: result.password
+      });
+
+      state.orders = state.orders.filter(x => String(x.id) !== String(orderId));
+      state.ordersTotal = Math.max(0, state.ordersTotal - 1);
+      renderOrders();
+
+      $("orderDetails").classList.add("hidden");
+      state.selectedOrderId = null;
+
+      await loadStats();
+      toast("تم حذف أمر الصيانة " + label + ".", "success", 5000);
+    } catch (err) {
+      toast("تعذر حذف الأمر: " + (err.message || err), "error", 6000);
+    } finally {
+      globalLoading(false);
     }
   }
 
@@ -2501,8 +2588,15 @@
           <button id="closeDetailsBtn" type="button" class="secondary">إغلاق التفاصيل</button>
         </div>
       </div>
-      <button id="closeReadOnlyBtn" type="button"
-              class="secondary ${canEditOrder ? "hidden" : ""}">إغلاق التفاصيل</button>`;
+      <div class="actions" style="margin-top:14px">
+        <button id="closeReadOnlyBtn" type="button"
+                class="secondary ${canEditOrder ? "hidden" : ""}">إغلاق التفاصيل</button>
+        ${state.currentProfile?.role === "admin" ? `
+          <button id="deleteOrderBtn" type="button" class="danger" data-order-id="${escapeHtml(o.id)}">
+            🗑️ حذف أمر الصيانة
+          </button>
+        ` : ""}
+      </div>`;
 
     $("detailStatus").appendChild(statusBadge(o.status));
     if ($("detailStatusSelect")) $("detailStatusSelect").value = o.status || "open";
@@ -2518,6 +2612,10 @@
       state.selectedOrderId = null;
     });
     $("saveDetailsBtn")?.addEventListener("click", saveOrderDetails);
+    $("deleteOrderBtn")?.addEventListener("click", (e) => {
+      const oid = e.currentTarget.getAttribute("data-order-id");
+      deleteWorkOrder(oid);
+    });
 
     await renderOrderPhotos(o.id);
   }
@@ -2866,8 +2964,15 @@
     if (creds) {
       $("projectUrl").value = creds.url || "";
       $("publicKey").value = creds.key || "";
+      // اتصال تلقائي إن كانت البيانات محفوظة
+      setTimeout(() => {
+        if (creds.url && creds.key) {
+          connect();
+        }
+      }, 100);
+    } else {
+      showState("setup");
     }
-    showState("setup");
   })();
 
 })();
